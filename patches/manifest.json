@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "components": {
+    "server": {
+      "revision": "d6df308acb9877a9365c741b30741de96202816e",
+      "patches": [
+        {
+          "patch": "patches/server/0001-enable-customization.patch",
+          "files": {
+            "Common/sources/license.js": {
+              "before": "ed86d90572fea6983f1bdaec628816e4a9e02397dd6e02a72a2e7cdd2dd8477e",
+              "after": "2f33c07f895e74804776fedf664df35ceddda0e8f1c9c101e906704e041def90"
+            }
+          }
+        },
+        {
+          "patch": "patches/server/0002-remove-community-quotas.patch",
+          "files": {
+            "DocService/sources/DocsCoServer.js": {
+              "before": "f73dfaf825a6cf1092e4876499d3f64cb93d1f2647c6ba15e8f564871c14e61e",
+              "after": "ed4aa8b9ce467f31c882db762791e1f9dc70ac61eba352405a80bfe859058dc6"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+--- a/DocService/sources/DocsCoServer.js
++++ b/DocService/sources/DocsCoServer.js
+@@ -3950,6 +3950,11 @@
+   }
+ 
+   function* _checkLicenseAuth(ctx, licenseInfo, userId, isLiveViewer) {
++    // Officier modification, 2026-09-09: no product seat/connection quotas for Community.
++    // Preserve the reported license status; document authorization is checked separately.
++    if (licenseInfo.packageType === constants.PACKAGE_TYPE_OS && licenseInfo.hasLicense === false) {
++      return licenseInfo.type;
++    }
+     const tenWarningLimitPercents = ctx.getCfg('license.warning_limit_percents', cfgWarningLimitPercents) / 100;
+     const tenNotificationRuleLicenseLimitEdit = ctx.getCfg(`notification.rules.licenseLimitEdit.template`, cfgNotificationRuleLicenseLimitEdit);
+     const tenNotificationRuleLicenseLimitLiveViewer = ctx.getCfg(

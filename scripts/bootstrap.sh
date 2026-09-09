@@ -23,4 +23,5 @@ case "${1:-}" in
     ;;
 esac
 
+python3 scripts/patches.py apply
 git submodule status

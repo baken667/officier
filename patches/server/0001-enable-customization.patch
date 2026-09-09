@@ -1,0 +1,25 @@
+--- a/Common/sources/license.js
++++ b/Common/sources/license.js
+@@ -40,6 +40,7 @@
+ const buildDate = '6/29/2016';
+ const oBuildDate = new Date(buildDate);
+ 
++// Officier modification, 2026-09-09: enable customization available in the open source runtime.
+ exports.readLicense = async function () {
+   const c_LR = constants.LICENSE_RESULT;
+   const now = new Date();
+@@ -50,11 +51,11 @@
+       type: c_LR.Success,
+       packageType: constants.PACKAGE_TYPE_OS,
+       mode: constants.LICENSE_MODE.None,
+-      branding: false,
++      branding: true,
+       connections: constants.LICENSE_CONNECTIONS_OS,
+       connectionsView: constants.LICENSE_CONNECTIONS_OS,
+-      customization: false,
+-      advancedApi: false,
++      customization: true,
++      advancedApi: true,
+       usersCount: 0,
+       usersViewCount: 0,
+       usersExpire: constants.LICENSE_EXPIRE_USERS_ONE_DAY,
