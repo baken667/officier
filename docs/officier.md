@@ -87,7 +87,7 @@ bash scripts/bootstrap.sh
 
 Инструкция upstream по сборке доступна из раздела **How to build** в
 [исходном README](../Readme.md#how-to-build). Build tools и упаковка находятся
-в отдельных репозиториях ONLYOFFICE; готовый контейнер Officier пока не подготовлен.
+в отдельных репозиториях ONLYOFFICE; готовый контейнер Officier публикуется в GHCR как `ghcr.io/baken667/officier`.
 
 Для обновления основы:
 

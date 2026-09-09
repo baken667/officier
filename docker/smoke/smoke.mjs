@@ -35,6 +35,17 @@ assert.notEqual((await jsonPost('/command', {c: 'version'}, false)).error, 0, 'I
 const version = await jsonPost('/command', {c: 'version'});
 assert.match(version.version, /^9\.4\.0\./);
 assert.match(await (await fetch(base + '/welcome/officier.html')).text(), /Officier/);
+
+const runtimeManifest = await (await fetch(base + '/officier/runtime/manifest.json')).json();
+assert.equal(runtimeManifest.protocolVersion, 1);
+assert.equal(runtimeManifest.capabilities.word, true);
+assert.equal(runtimeManifest.capabilities.wopi, true);
+assert.equal(runtimeManifest.capabilities.noIframe, true);
+assert.deepEqual(runtimeManifest.assets.map(asset => asset.url), [
+  '/web-apps/vendor/socketio/socket.io.min.js',
+  '/sdkjs/word/sdk-all-min.js',
+  'runtime/direct-word-adapter.js'
+]);
 console.log('Health, runtime capabilities, protocol version and JWT checks passed');
 
 execFileSync('python3', ['document.py'], {cwd: import.meta.dirname});
@@ -73,6 +84,13 @@ const fixture = createServer(async (req, res) => {
 await new Promise(resolve => fixture.listen(8090, '0.0.0.0', resolve));
 const browser = await chromium.launch({headless: true});
 try {
+  const probe = await browser.newPage();
+  await probe.setContent(`<!doctype html><html><head></head><body><div id="host"></div>${runtimeManifest.assets.map(asset => `<script src="${new URL(asset.url, base + '/officier/')}"></script>`).join('')}</body></html>`);
+  await probe.waitForFunction(() => !!window.OfficierDirectRuntime && !!window.Asc?.asc_docs_api && !!window.io);
+  assert.equal(await probe.evaluate(() => !!document.querySelector('iframe')), false);
+  await probe.close();
+  console.log('Direct runtime browser assets loaded without creating an iframe');
+
   const page = await browser.newPage({viewport: {width: 1440, height: 1000}});
   page.on('pageerror', error => console.log('Browser error:', error.message));
   await page.goto('http://127.0.0.1:8090/');

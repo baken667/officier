@@ -1,14 +1,19 @@
 diff --git a/DocService/sources/routes/officierRuntime.js b/DocService/sources/routes/officierRuntime.js
-index 52c5686..fa14933 100644
+index 52c5686..c392ceb 100644
 --- a/DocService/sources/routes/officierRuntime.js
 +++ b/DocService/sources/routes/officierRuntime.js
-@@ -16,6 +16,41 @@ const operationContext = require('../../../Common/sources/operationContext');
+@@ -17,6 +17,385 @@ const operationContext = require('../../../Common/sources/operationContext');
  
  const router = express.Router();
  
 +function buildDirectWordAdapterScript() {
 +  return `(function () {
 +  'use strict';
++
++  var adapterScriptUrl = document.currentScript && document.currentScript.src
++    ? document.currentScript.src
++    : window.location.href;
++  var mountCounter = 0;
 +
 +  function OfficierDirectRuntimeError(code, message) {
 +    this.name = 'OfficierDirectRuntimeError';
@@ -25,6 +30,303 @@ index 52c5686..fa14933 100644
 +    }
 +  }
 +
++  function asRecord(value) {
++    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
++  }
++
++  function getBootstrap(context) {
++    var bootstrap = asRecord(context.session.bootstrap);
++    if (!bootstrap || !asRecord(bootstrap.fileInfo) || !asRecord(bootstrap.userAuth) || !bootstrap.key) {
++      throw new OfficierDirectRuntimeError(
++        'OFFICIER_RUNTIME_LOAD_FAILED',
++        'Officier WOPI bootstrap data is incomplete'
++      );
++    }
++    return bootstrap;
++  }
++
++  function getAscConstructor(name) {
++    var Asc = asRecord(window.Asc);
++    var value = Asc && Asc[name];
++    return typeof value === 'function' ? value : null;
++  }
++
++  function getWordApiConstructor() {
++    return getAscConstructor('asc_docs_api') || (typeof window.asc_docs_api === 'function' ? window.asc_docs_api : null);
++  }
++
++  function runtimeUrl(path) {
++    return new URL(path, adapterScriptUrl).toString();
++  }
++
++  function runtimeOrigin() {
++    return new URL(adapterScriptUrl, window.location.href).origin;
++  }
++
++  function configureSdkPaths() {
++    var AscCommon = asRecord(window.AscCommon);
++    if (!AscCommon) return;
++
++    var editorPathname = '/web-apps/apps/documenteditor/main/';
++    var editorBaseUrl = runtimeUrl(editorPathname);
++    AscCommon.getBaseUrl = function () {
++      return editorBaseUrl;
++    };
++    AscCommon.getBaseUrlPathname = function () {
++      return editorPathname;
++    };
++    if (typeof window.io === 'function') {
++      var socketIo = window.io;
++      AscCommon.getSocketIO = function () {
++        return function (options) {
++          return socketIo(runtimeOrigin(), options);
++        };
++      };
++    }
++    if (typeof AscCommon.loadScript === 'function') {
++      AscCommon.loadChartStyles = function (onSuccess, onError) {
++        AscCommon.loadScript(runtimeUrl('/sdkjs/common/Charts/ChartStyles.js'), onSuccess, onError);
++      };
++      AscCommon.loadPathBoolean = function (onSuccess, onError) {
++        AscCommon.loadScript(runtimeUrl('/sdkjs/common/Drawings/Format/path-boolean-min.js'), onSuccess, onError);
++      };
++    }
++  }
++
++  function createMountRoot(container) {
++    var ownerDocument = container.ownerDocument || document;
++    var root = ownerDocument.createElement('div');
++    root.id = 'officier_direct_word_' + (++mountCounter);
++    root.className = 'officier-direct-word-runtime';
++    root.style.position = 'relative';
++    root.style.width = '100%';
++    root.style.height = '100%';
++    root.style.minHeight = '360px';
++    root.style.overflow = 'hidden';
++    root.tabIndex = 0;
++    container.replaceChildren(root);
++    return root;
++  }
++
++  function createUserInfo(fileInfo) {
++    var UserInfo = getAscConstructor('asc_CUserInfo');
++    if (!UserInfo) return null;
++
++    var user = new UserInfo();
++    if (user.put_Id) user.put_Id(fileInfo.UserId || 'officier-user');
++    if (user.put_FullName) user.put_FullName(fileInfo.IsAnonymousUser ? '' : (fileInfo.UserFriendlyName || 'Officier User'));
++    if (user.put_IsAnonymousUser) user.put_IsAnonymousUser(!!fileInfo.IsAnonymousUser);
++    return user;
++  }
++
++  function createPermissions(fileInfo, queryParams) {
++    var edit = !fileInfo.ReadOnly && !fileInfo.UserCanOnlyComment && !!fileInfo.UserCanWrite && (!queryParams || queryParams.formsubmit !== '1');
++    var review = fileInfo.UserCanOnlyComment || fileInfo.SupportsReviewing === false
++      ? false
++      : fileInfo.UserCanReview === false
++        ? false
++        : !!fileInfo.UserCanReview;
++
++    return {
++      edit: edit,
++      review: review,
++      comment: edit || !!fileInfo.UserCanOnlyComment,
++      copy: fileInfo.CopyPasteRestrictions !== 'CurrentDocumentOnly' && fileInfo.CopyPasteRestrictions !== 'BlockAll',
++      print: !fileInfo.DisablePrint && !fileInfo.HidePrintOption,
++      chat: !queryParams || queryParams.dchat !== '1',
++      fillForms: edit || (!!queryParams && queryParams.formsubmit === '1')
++    };
++  }
++
++  function createDocInfo(bootstrap) {
++    var DocInfo = getAscConstructor('asc_CDocInfo');
++    if (!DocInfo) {
++      throw new OfficierDirectRuntimeError(
++        'OFFICIER_DIRECT_SDK_BRIDGE_MISSING',
++        'Officier SDK did not expose Asc.asc_CDocInfo'
++      );
++    }
++
++    var docInfo = new DocInfo();
++    if (typeof docInfo.extendWithWopiParams === 'function') {
++      docInfo = docInfo.extendWithWopiParams({
++        key: bootstrap.key,
++        userAuth: bootstrap.userAuth,
++        fileInfo: bootstrap.fileInfo,
++        token: bootstrap.token
++      });
++    } else {
++      throw new OfficierDirectRuntimeError(
++        'OFFICIER_DIRECT_SDK_BRIDGE_MISSING',
++        'Officier SDK did not expose CDocInfo.extendWithWopiParams'
++      );
++    }
++
++    var user = createUserInfo(bootstrap.fileInfo);
++    if (user && docInfo.put_UserInfo) docInfo.put_UserInfo(user);
++    if (docInfo.put_Permissions) docInfo.put_Permissions(createPermissions(bootstrap.fileInfo, bootstrap.queryParams));
++    if (bootstrap.queryParams && bootstrap.queryParams.lang && docInfo.put_Lang) docInfo.put_Lang(bootstrap.queryParams.lang);
++    if (docInfo.put_Token && bootstrap.token) docInfo.put_Token(bootstrap.token);
++    return docInfo;
++  }
++
++  function registerEvent(api, name, callback) {
++    if (api && typeof api.asc_registerCallback === 'function') {
++      api.asc_registerCallback(name, callback);
++    }
++  }
++
++  function unregisterEvent(api, name, callback) {
++    if (api && typeof api.asc_unregisterCallback === 'function') {
++      api.asc_unregisterCallback(name, callback);
++    }
++  }
++
++  function buildController(api, readOnly) {
++    var state = {
++      ready: false,
++      readOnly: !!readOnly,
++      canUndo: false,
++      canRedo: false,
++      bold: false,
++      italic: false
++    };
++    var listeners = [];
++    var subscriptions = [];
++    var disposed = false;
++
++    function snapshot() {
++      return Object.freeze({
++        ready: state.ready,
++        readOnly: state.readOnly,
++        canUndo: state.canUndo,
++        canRedo: state.canRedo,
++        bold: state.bold,
++        italic: state.italic
++      });
++    }
++
++    function emit() {
++      listeners.slice().forEach(function (listener) {
++        listener();
++      });
++    }
++
++    function update(values) {
++      var changed = false;
++      Object.keys(values).forEach(function (key) {
++        if (state[key] !== values[key]) {
++          state[key] = values[key];
++          changed = true;
++        }
++      });
++      if (changed) emit();
++    }
++
++    function subscribeSdk(name, key) {
++      var callback = function (value) {
++        var values = {};
++        values[key] = !!value;
++        update(values);
++      };
++      registerEvent(api, name, callback);
++      subscriptions.push([name, callback]);
++    }
++
++    subscribeSdk('asc_onCanUndo', 'canUndo');
++    subscribeSdk('asc_onCanRedo', 'canRedo');
++    subscribeSdk('asc_onBold', 'bold');
++    subscribeSdk('asc_onItalic', 'italic');
++
++    function invoke(operation, allowed) {
++      if (disposed) throw new Error('Word controller is disposed');
++      if (!state.ready || state.readOnly || allowed === false) return false;
++      operation();
++      return true;
++    }
++
++    return Object.freeze({
++      getSnapshot: snapshot,
++      getServerSnapshot: snapshot,
++      subscribe: function (listener) {
++        if (disposed) throw new Error('Word controller is disposed');
++        listeners.push(listener);
++        return function () {
++          listeners = listeners.filter(function (item) {
++            return item !== listener;
++          });
++        };
++      },
++      setSession: function (sessionState) {
++        update({ready: !!sessionState.ready, readOnly: !!sessionState.readOnly});
++      },
++      toggleBold: function () {
++        return invoke(function () { api.put_TextPrBold(!state.bold); });
++      },
++      toggleItalic: function () {
++        return invoke(function () { api.put_TextPrItalic(!state.italic); });
++      },
++      undo: function () {
++        return invoke(function () { api.Undo(); }, state.canUndo);
++      },
++      redo: function () {
++        return invoke(function () { api.Redo(); }, state.canRedo);
++      },
++      save: function () {
++        return invoke(function () { api.asc_Save(); });
++      },
++      dispose: function () {
++        if (disposed) return;
++        update({ready: false, readOnly: true});
++        disposed = true;
++        subscriptions.forEach(function (entry) {
++          unregisterEvent(api, entry[0], entry[1]);
++        });
++        listeners = [];
++        subscriptions = [];
++      }
++    });
++  }
++
++  function waitForDocumentReady(api, signal) {
++    return new Promise(function (resolve, reject) {
++      var settled = false;
++
++      function cleanup() {
++        unregisterEvent(api, 'asc_onDocumentContentReady', onReady);
++        unregisterEvent(api, 'asc_onError', onError);
++        if (signal) signal.removeEventListener('abort', onAbort);
++      }
++
++      function finish(callback, value) {
++        if (settled) return;
++        settled = true;
++        cleanup();
++        callback(value);
++      }
++
++      function onReady() {
++        finish(resolve);
++      }
++
++      function onError(code, level) {
++        var error = new OfficierDirectRuntimeError(
++          'OFFICIER_RUNTIME_LOAD_FAILED',
++          'Officier SDK failed to open the document: ' + code + (level === undefined ? '' : ' / ' + level)
++        );
++        finish(reject, error);
++      }
++
++      function onAbort() {
++        finish(reject, new OfficierDirectRuntimeError('OFFICIER_ABORTED', 'Officier word mount was aborted'));
++      }
++
++      registerEvent(api, 'asc_onDocumentContentReady', onReady);
++      registerEvent(api, 'asc_onError', onError);
++      if (signal) signal.addEventListener('abort', onAbort, {once: true});
++    });
++  }
++
 +  window.OfficierDirectRuntime = Object.freeze({
 +    async mountWord(context) {
 +      if (!context || !context.container || !context.session || !context.manifest) {
@@ -32,10 +334,52 @@ index 52c5686..fa14933 100644
 +      }
 +
 +      assertNoIframe(context.container);
-+      throw new OfficierDirectRuntimeError(
-+        'OFFICIER_DIRECT_SDK_BRIDGE_MISSING',
-+        'Officier direct word adapter loaded, but the SDK bridge is not wired yet'
-+      );
++
++      var WordApi = getWordApiConstructor();
++      if (!WordApi) {
++        throw new OfficierDirectRuntimeError(
++          'OFFICIER_DIRECT_SDK_BRIDGE_MISSING',
++          'Officier SDK did not expose the word asc_docs_api constructor'
++        );
++      }
++
++      var bootstrap = getBootstrap(context);
++      configureSdkPaths();
++      var mountRoot = createMountRoot(context.container);
++      var api = new WordApi({
++        'id-view': mountRoot.id,
++        'translate': {},
++        'isRtlInterface': false
++      });
++      var docInfo = createDocInfo(bootstrap);
++      var controller = buildController(api, !context.session.canEdit || bootstrap.userAuth.mode === 'view');
++      var ready = waitForDocumentReady(api, context.signal);
++      var onPermissions = function () {
++        if (api.asc_LoadDocument) api.asc_LoadDocument();
++      };
++      registerEvent(api, 'asc_onGetEditorPermissions', onPermissions);
++
++      if (api.asc_setDocInfo) api.asc_setDocInfo(docInfo);
++      if (api.asc_getEditorPermissions) api.asc_getEditorPermissions();
++      else if (api.asc_LoadDocument) api.asc_LoadDocument();
++
++      assertNoIframe(context.container);
++      await ready;
++      assertNoIframe(context.container);
++      unregisterEvent(api, 'asc_onGetEditorPermissions', onPermissions);
++      controller.setSession({ready: true, readOnly: !context.session.canEdit || bootstrap.userAuth.mode === 'view'});
++
++      return {
++        controller: controller,
++        dispose: function () {
++          controller.dispose();
++          unregisterEvent(api, 'asc_onGetEditorPermissions', onPermissions);
++          if (api.asc_coAuthoringDisconnect) api.asc_coAuthoringDisconnect();
++          if (api.asc_CloseFile) api.asc_CloseFile();
++          mountRoot.remove();
++          assertNoIframe(context.container);
++        }
++      };
 +    }
 +  });
 +})();\n`;
@@ -44,7 +388,7 @@ index 52c5686..fa14933 100644
  function buildManifest() {
    const buildVersion = commonDefines.buildVersion || 'unknown';
    const buildNumber = commonDefines.buildNumber || 'unknown';
-@@ -25,7 +60,12 @@ function buildManifest() {
+@@ -25,18 +404,42 @@ function buildManifest() {
      protocolVersion: 1,
      buildId: `officier-${buildVersion}-${buildNumber}`,
      sdkVersion: `${buildVersion}.${buildNumber}`,
@@ -52,13 +396,27 @@ index 52c5686..fa14933 100644
 +    assets: [
 +      {
 +        kind: 'script',
++        url: '/web-apps/vendor/socketio/socket.io.min.js'
++      },
++      {
++        kind: 'script',
++        url: '/sdkjs/word/sdk-all-min.js'
++      },
++      {
++        kind: 'script',
 +        url: 'runtime/direct-word-adapter.js'
 +      }
 +    ],
      capabilities: {
-       word: false,
+-      word: false,
++      word: true,
        wopi: true,
-@@ -39,4 +79,19 @@ function buildManifest() {
+       noIframe: true
+     },
+-    limitations: [
+-      'OFFICIER_DIRECT_WORD_ADAPTER_MISSING'
+-    ]
++    limitations: []
    };
  }
  
