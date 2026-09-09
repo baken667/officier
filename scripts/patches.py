@@ -42,6 +42,12 @@ def inspect(root):
                 source = inside(directory, relative)
                 if not source.exists() and hashes.get('before') is None:
                     state = 'before'
+                elif not source.exists() and any(
+                    item['files'].get(relative, {}).get('before') is None
+                    and item['files'].get(relative, {}).get('after') == hashes.get('before')
+                    for item in patches[:index]
+                ):
+                    state = 'before'
                 elif source.exists():
                     digest = hashlib.sha256(source.read_bytes()).hexdigest()
                     state = next((name for name in ('before', 'after') if hashes.get(name) == digest), None)

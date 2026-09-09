@@ -79,6 +79,42 @@ class PatchTests(unittest.TestCase):
             patches.run(self.root, 'apply')
         self.assertEqual(patches.git(self.server, 'status', '--porcelain'), '')
 
+    def test_new_file_can_be_changed_by_later_patch(self):
+        (self.root / 'patches/c-create.patch').write_text(
+            'diff --git a/c b/c\n'
+            'new file mode 100644\n'
+            'index 0000000..a403026\n'
+            '--- /dev/null\n'
+            '+++ b/c\n'
+            '@@ -0,0 +1 @@\n'
+            '+created\n'
+        )
+        (self.root / 'patches/c-update.patch').write_text(
+            'diff --git a/c b/c\n'
+            'index a403026..181b4d5 100644\n'
+            '--- a/c\n'
+            '+++ b/c\n'
+            '@@ -1 +1 @@\n'
+            '-created\n'
+            '+updated\n'
+        )
+        self.manifest['components']['server']['patches'].extend([
+            {'patch': 'patches/c-create.patch', 'files': {'c': {
+                'before': None,
+                'after': hashlib.sha256(b'created\n').hexdigest()
+            }}},
+            {'patch': 'patches/c-update.patch', 'files': {'c': {
+                'before': hashlib.sha256(b'created\n').hexdigest(),
+                'after': hashlib.sha256(b'updated\n').hexdigest()
+            }}}
+        ])
+        self.write_manifest()
+
+        patches.run(self.root, 'apply')
+        self.assertEqual((self.server / 'c').read_text(), 'updated\n')
+        patches.run(self.root, 'revert')
+        self.assertEqual(patches.git(self.server, 'status', '--porcelain'), '')
+
 
 if __name__ == '__main__':
     unittest.main()
