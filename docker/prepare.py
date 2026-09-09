@@ -12,11 +12,14 @@ if not re.fullmatch(r'[0-9a-f]{40}', revision):
 if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?', version):
     raise SystemExit('Invalid Officier version')
 manifest = json.loads((server.parent / 'patches/manifest.json').read_text())
+expected = {}
 for patch in manifest['components']['server']['patches']:
     for name, hashes in patch['files'].items():
-        actual = hashlib.sha256((server / name).read_bytes()).hexdigest()
-        if actual != hashes['after']:
-            raise SystemExit(f'{name}: Officier patch is missing or source has changed')
+        expected[name] = hashes['after']
+for name, digest in expected.items():
+    actual = hashlib.sha256((server / name).read_bytes()).hexdigest()
+    if actual != digest:
+        raise SystemExit(f'{name}: Officier patch is missing or source has changed')
 package = Path(version_file).read_text().strip()
 match = re.fullmatch(r'(9\.4\.0)-(\d+)(?:.*)?', package)
 if not match:

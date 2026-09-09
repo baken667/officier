@@ -47,6 +47,15 @@
               "after": "02dc5797fcc7a455b5463b65c431b768dbf0b5aba7b2b9b7b963a51f87fa730a"
             }
           }
+        },
+        {
+          "patch": "patches/server/0005-add-officier-direct-runtime-asset.patch",
+          "files": {
+            "DocService/sources/routes/officierRuntime.js": {
+              "before": "225d60319c3b524b4e59f981513cb8b33607de29e622619cc92b7d9f6a0d181a",
+              "after": "37755160e9c123ab345e375e60921194b78d4259fcdc64f99516cae1c8cb9de6"
+            }
+          }
         }
       ]
     }

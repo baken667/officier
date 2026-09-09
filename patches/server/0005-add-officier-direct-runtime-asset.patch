@@ -1,0 +1,80 @@
+diff --git a/DocService/sources/routes/officierRuntime.js b/DocService/sources/routes/officierRuntime.js
+index 52c5686..fa14933 100644
+--- a/DocService/sources/routes/officierRuntime.js
++++ b/DocService/sources/routes/officierRuntime.js
+@@ -16,6 +16,44 @@ const operationContext = require('../../../Common/sources/operationContext');
+ 
+ const router = express.Router();
+ 
++function buildDirectWordAdapterScript() {
++  return `(function () {
++  'use strict';
++
++  function OfficierDirectRuntimeError(code, message) {
++    this.name = 'OfficierDirectRuntimeError';
++    this.code = code;
++    this.message = message;
++    if (Error.captureStackTrace) Error.captureStackTrace(this, OfficierDirectRuntimeError);
++  }
++  OfficierDirectRuntimeError.prototype = Object.create(Error.prototype);
++  OfficierDirectRuntimeError.prototype.constructor = OfficierDirectRuntimeError;
++
++  function assertNoIframe(container) {
++    if (container && container.querySelector && container.querySelector('iframe')) {
++      throw new OfficierDirectRuntimeError('OFFICIER_IFRAME_DETECTED', 'Officier direct runtime created an iframe');
++    }
++  }
++
++  window.OfficierDirectRuntime = Object.freeze({
++    async mountWord(context) {
++      if (!context || !context.container || !context.session || !context.manifest) {
++        throw new OfficierDirectRuntimeError('OFFICIER_RUNTIME_LOAD_FAILED', 'Invalid Officier direct runtime mount context');
++      }
++
++      assertNoIframe(context.container);
++      throw new OfficierDirectRuntimeError(
++        'OFFICIER_DIRECT_SDK_BRIDGE_MISSING',
++        'Officier direct word adapter loaded, but the SDK bridge is not wired yet'
++      );
++    }
++  });
++})();\n`;
++}
++
+ function buildManifest() {
+   const buildVersion = commonDefines.buildVersion || 'unknown';
+   const buildNumber = commonDefines.buildNumber || 'unknown';
+@@ -25,7 +63,12 @@ function buildManifest() {
+     protocolVersion: 1,
+     buildId: `officier-${buildVersion}-${buildNumber}`,
+     sdkVersion: `${buildVersion}.${buildNumber}`,
+-    assets: [],
++    assets: [
++      {
++        kind: 'script',
++        url: 'runtime/direct-word-adapter.js'
++      }
++    ],
+     capabilities: {
+       word: false,
+       wopi: true,
+@@ -39,6 +82,21 @@ function buildManifest() {
+   };
+ }
+ 
++router.get('/runtime/direct-word-adapter.js', async (req, res) => {
++  const ctx = new operationContext.Context();
++  try {
++    ctx.initFromRequest(req);
++    await ctx.initTenantCache();
++    res.setHeader('Cache-Control', 'no-store');
++    res.type('application/javascript').send(buildDirectWordAdapterScript());
++  } catch (err) {
++    ctx.logger.error('officier/runtime/direct-word-adapter.js error: %s', err.stack);
++    res.sendStatus(500);
++  }
++});
++
+ router.get('/runtime/manifest.json', async (req, res) => {
+   const ctx = new operationContext.Context();
+   try {
