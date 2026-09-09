@@ -17,10 +17,12 @@ write_launcher DocService/prepare4shutdown DocService/sources/shutdown.js
 write_launcher FileConverter/converter FileConverter/sources/convertermaster.js
 write_launcher Metrics/metrics Metrics/node_modules/statsd/bin/statsd
 
-cp /tmp/officier-welcome.html "$root/server/welcome/officier.html"
-cp /tmp/officier-welcome.html "$root/server/welcome/index.html"
-cp /usr/share/officier/LICENSE "$root/server/welcome/officier-license.txt"
-cp /usr/share/officier/build.json "$root/server/welcome/officier-build.json"
+welcome=/var/www/onlyoffice/documentserver-example/welcome
+test -d "$welcome"
+cp /tmp/officier-welcome.html "$welcome/officier.html"
+cp /tmp/officier-welcome.html "$welcome/docker.html"
+cp /usr/share/officier/LICENSE "$welcome/officier-license.txt"
+cp /usr/share/officier/build.json "$welcome/officier-build.json"
 
 # Make the modification/source notice reachable from every editor, preserving upstream notices.
 /usr/local/bin/officier-node <<'JS'
