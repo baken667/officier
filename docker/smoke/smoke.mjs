@@ -85,9 +85,40 @@ await new Promise(resolve => fixture.listen(8090, '0.0.0.0', resolve));
 const browser = await chromium.launch({headless: true});
 try {
   const probe = await browser.newPage();
-  await probe.setContent(`<!doctype html><html><head></head><body><div id="host"></div>${runtimeManifest.assets.map(asset => `<script src="${new URL(asset.url, base + '/officier/')}"></script>`).join('')}</body></html>`);
-  await probe.waitForFunction(() => !!window.OfficierDirectRuntime && !!window.Asc?.asc_docs_api && !!window.io);
-  assert.equal(await probe.evaluate(() => !!document.querySelector('iframe')), false);
+  const probeErrors = [];
+  probe.on('pageerror', error => probeErrors.push(error.message));
+  const probeResult = await probe.evaluate(async ({assets, baseUrl}) => {
+    const loaded = [];
+    const failed = [];
+    for (const asset of assets) {
+      const url = new URL(asset.url, baseUrl).toString();
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.onload = () => {
+          loaded.push(url);
+          resolve();
+        };
+        script.onerror = () => {
+          failed.push(url);
+          reject(new Error(`Failed to load ${url}`));
+        };
+        document.head.append(script);
+      });
+    }
+    return {
+      loaded,
+      failed,
+      directRuntime: !!window.OfficierDirectRuntime,
+      wordApi: !!(window.Asc?.asc_docs_api || window.asc_docs_api),
+      socketIo: !!window.io,
+      iframe: !!document.querySelector('iframe')
+    };
+  }, {assets: runtimeManifest.assets, baseUrl: base + '/officier/'});
+  assert.equal(probeResult.socketIo, true, JSON.stringify({probeResult, probeErrors}));
+  assert.equal(probeResult.wordApi, true, JSON.stringify({probeResult, probeErrors}));
+  assert.equal(probeResult.directRuntime, true, JSON.stringify({probeResult, probeErrors}));
+  assert.equal(probeResult.iframe, false, JSON.stringify({probeResult, probeErrors}));
   await probe.close();
   console.log('Direct runtime browser assets loaded without creating an iframe');
 
