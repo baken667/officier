@@ -1,0 +1,268 @@
+diff --git a/DocService/sources/wopiClient.js b/DocService/sources/wopiClient.js
+index 73712b0..1e29bef 100644
+--- a/DocService/sources/wopiClient.js
++++ b/DocService/sources/wopiClient.js
+@@ -676,96 +676,115 @@ async function prepareDocumentForEditing(ctx, wopiSrc, fileInfo, userAuth, fileT
+   return true;
+ }
+ 
+-function getEditorHtml(req, res) {
+-  return co(function* () {
+-    const params = {
+-      statusCode: undefined,
+-      key: undefined,
+-      apiQuery: '',
+-      fileInfo: {},
+-      userAuth: {},
+-      queryParams: req.query,
+-      token: undefined,
+-      documentType: undefined,
+-      docs_api_config: {}
+-    };
+-    const ctx = new operationContext.Context();
+-    try {
+-      ctx.initFromRequest(req);
+-      yield ctx.initTenantCache();
+-      const tenTokenOutboxAlgorithm = ctx.getCfg('services.CoAuthoring.token.outbox.algorithm', cfgTokenOutboxAlgorithm);
+-      const tenTokenOutboxExpires = ctx.getCfg('services.CoAuthoring.token.outbox.expires', cfgTokenOutboxExpires);
+-      const tenWopiFileInfoBlockList = ctx.getCfg('wopi.fileInfoBlockList', cfgWopiFileInfoBlockList);
++function createEditorParams(req) {
++  return {
++    statusCode: undefined,
++    key: undefined,
++    apiQuery: '',
++    fileInfo: {},
++    userAuth: {},
++    queryParams: req.query,
++    token: undefined,
++    documentType: undefined,
++    docs_api_config: {}
++  };
++}
+ 
+-      const wopiSrc = req.query['wopisrc'];
+-      const fileId = wopiSrc.substring(wopiSrc.lastIndexOf('/') + 1);
+-      ctx.setDocId(fileId);
+-      const usid = req.query['usid'] || crypto.randomUUID();
+-      ctx.setUserSessionId(usid);
+-
+-      ctx.logger.info('wopiEditor start');
+-      ctx.logger.debug(`wopiEditor req.url:%s`, req.url);
+-      ctx.logger.debug(`wopiEditor req.query:%j`, req.query);
+-      ctx.logger.debug(`wopiEditor req.body:%j`, req.body);
+-      params.apiQuery = `?${constants.SHARD_KEY_WOPI_NAME}=${encodeURIComponent(wopiSrc)}`;
+-      params.documentType = req.params.documentType;
+-      let mode = req.params.mode;
+-      const sc = req.query['sc'];
+-      const lang = req.query['lang'];
+-      const ui = req.query['ui'];
+-      const access_token = req.body['access_token'] || '';
+-      const access_token_ttl = parseInt(req.body['access_token_ttl']) || 0;
+-      const docs_api_config = req.body['docs_api_config'];
+-      if (docs_api_config) {
+-        params.docs_api_config = JSON.parse(docs_api_config);
+-      }
+-      // Create user authentication object
+-      const userAuth = (params.userAuth = {
+-        wopiSrc,
+-        access_token,
+-        access_token_ttl,
+-        userSessionId: usid,
+-        mode,
+-        forcedViewMode: false
+-      });
++async function prepareEditorSession(req, ctx, params, logPrefix) {
++  ctx.initFromRequest(req);
++  await ctx.initTenantCache();
++  const tenTokenOutboxAlgorithm = ctx.getCfg('services.CoAuthoring.token.outbox.algorithm', cfgTokenOutboxAlgorithm);
++  const tenTokenOutboxExpires = ctx.getCfg('services.CoAuthoring.token.outbox.expires', cfgTokenOutboxExpires);
++  const tenWopiFileInfoBlockList = ctx.getCfg('wopi.fileInfoBlockList', cfgWopiFileInfoBlockList);
++
++  const wopiSrc = req.query['wopisrc'];
++  if (!wopiSrc) {
++    params.statusCode = 400;
++    params.fileInfo = {};
++    return {ok: false};
++  }
+ 
+-      const fileInfo = (params.fileInfo = yield checkFileInfo(ctx, wopiSrc, access_token, sc));
+-      if (!fileInfo || fileInfo.error) {
+-        if (fileInfo && fileInfo.error) {
+-          params.statusCode = fileInfo.statusCode;
+-        }
+-        params.fileInfo = {};
+-        return;
+-      }
+-      const fileType = getFileTypeByInfo(fileInfo);
+-      if (!shutdownFlag) {
+-        yield checkAndReplaceEmptyFile(ctx, fileInfo, wopiSrc, access_token, access_token_ttl, lang, ui, fileType);
+-      }
++  const fileId = wopiSrc.substring(wopiSrc.lastIndexOf('/') + 1);
++  ctx.setDocId(fileId);
++  const usid = req.query['usid'] || crypto.randomUUID();
++  ctx.setUserSessionId(usid);
++
++  ctx.logger.info('%s start', logPrefix);
++  ctx.logger.debug('%s req.url:%s', logPrefix, req.url);
++  ctx.logger.debug('%s req.query:%j', logPrefix, req.query);
++  ctx.logger.debug('%s req.body:%j', logPrefix, req.body);
++  params.apiQuery = `?${constants.SHARD_KEY_WOPI_NAME}=${encodeURIComponent(wopiSrc)}`;
++  params.documentType = req.params.documentType;
++  const sc = req.query['sc'];
++  const lang = req.query['lang'];
++  const ui = req.query['ui'];
++  const access_token = req.body['access_token'] || '';
++  const access_token_ttl = parseInt(req.body['access_token_ttl']) || 0;
++  const docs_api_config = req.body['docs_api_config'];
++  if (docs_api_config) {
++    params.docs_api_config = JSON.parse(docs_api_config);
++  }
+ 
+-      const canEdit = fileInfo.UserCanOnlyComment || fileInfo.UserCanWrite || fileInfo.UserCanReview;
+-      if (!canEdit) {
+-        ctx.logger.warn('wopiEditor: edit mode is not allowed, fallback to view mode');
+-        userAuth.mode = 'view';
+-        userAuth.forcedViewMode = true;
+-      }
++  const userAuth = (params.userAuth = {
++    wopiSrc,
++    access_token,
++    access_token_ttl,
++    userSessionId: usid,
++    mode: req.params.mode,
++    forcedViewMode: false
++  });
+ 
+-      // Prepare document for editing (docId, cache validation)
+-      const prepareResult = yield prepareDocumentForEditing(ctx, wopiSrc, fileInfo, userAuth, fileType, utils.getBaseUrlByRequest(ctx, req), params);
+-      if (!prepareResult) {
+-        params.fileInfo = {};
+-        return;
+-      }
++  const fileInfo = (params.fileInfo = await checkFileInfo(ctx, wopiSrc, access_token, sc));
++  if (!fileInfo || fileInfo.error) {
++    if (fileInfo && fileInfo.error) {
++      params.statusCode = fileInfo.statusCode;
++    }
++    params.fileInfo = {};
++    return {ok: false};
++  }
+ 
+-      mode = userAuth.mode;
+-      ctx.setDocId(params.key);
++  const fileType = getFileTypeByInfo(fileInfo);
++  if (!shutdownFlag) {
++    await checkAndReplaceEmptyFile(ctx, fileInfo, wopiSrc, access_token, access_token_ttl, lang, ui, fileType);
++  }
+ 
+-      tenWopiFileInfoBlockList.forEach(item => {
+-        delete params.fileInfo[item];
+-      });
++  const canEdit = fileInfo.UserCanOnlyComment || fileInfo.UserCanWrite || fileInfo.UserCanReview;
++  if (!canEdit) {
++    ctx.logger.warn('%s: edit mode is not allowed, fallback to view mode', logPrefix);
++    userAuth.mode = 'view';
++    userAuth.forcedViewMode = true;
++  }
++
++  const prepareResult = await prepareDocumentForEditing(ctx, wopiSrc, fileInfo, userAuth, fileType, utils.getBaseUrlByRequest(ctx, req), params);
++  if (!prepareResult) {
++    params.fileInfo = {};
++    return {ok: false};
++  }
+ 
+-      const options = {algorithm: tenTokenOutboxAlgorithm, expiresIn: tenTokenOutboxExpires};
+-      const secret = yield tenantManager.getTenantSecret(ctx, commonDefines.c_oAscSecretType.Browser);
+-      params.token = jwt.sign(params, utils.getJwtHsKey(secret), options);
++  ctx.setDocId(params.key);
++
++  tenWopiFileInfoBlockList.forEach(item => {
++    delete params.fileInfo[item];
++  });
++
++  const options = {algorithm: tenTokenOutboxAlgorithm, expiresIn: tenTokenOutboxExpires};
++  const secret = await tenantManager.getTenantSecret(ctx, commonDefines.c_oAscSecretType.Browser);
++  params.token = jwt.sign(params, utils.getJwtHsKey(secret), options);
++
++  return {
++    ok: true,
++    fileType,
++    canEdit: userAuth.mode !== 'view',
++    documentTitle: params.fileInfo.BaseFileName || params.fileInfo.FileName || ''
++  };
++}
++
++function getEditorHtml(req, res) {
++  return co(function* () {
++    const params = createEditorParams(req);
++    const ctx = new operationContext.Context();
++    try {
++      yield prepareEditorSession(req, ctx, params, 'wopiEditor');
+     } catch (err) {
+       ctx.logger.error('wopiEditor error: %s', err.stack);
+       params.fileInfo = {};
+@@ -781,6 +800,37 @@ function getEditorHtml(req, res) {
+     }
+   });
+ }
++
++function getEditorSessionJson(req, res) {
++  return co(function* () {
++    const params = createEditorParams(req);
++    const ctx = new operationContext.Context();
++    try {
++      const result = yield prepareEditorSession(req, ctx, params, 'officierWopiSession');
++      if (!result.ok) {
++        res.status(params.statusCode || 400).json({
++          error: 'OFFICIER_WOPI_SESSION_FAILED',
++          statusCode: params.statusCode || 400
++        });
++        return;
++      }
++
++      res.json({
++        id: params.key,
++        mode: 'wopi',
++        documentTitle: result.documentTitle,
++        fileType: result.fileType,
++        canEdit: result.canEdit,
++        bootstrap: params
++      });
++    } catch (err) {
++      ctx.logger.error('officierWopiSession error: %s', err.stack);
++      res.sendStatus(500);
++    } finally {
++      ctx.logger.info('officierWopiSession end');
++    }
++  });
++}
+ function getConverterHtml(req, res) {
+   return co(function* () {
+     const params = {statusHandler: undefined};
+@@ -1276,6 +1326,7 @@ exports.discovery = discovery;
+ exports.collaboraCapabilities = collaboraCapabilities;
+ exports.parseWopiCallback = parseWopiCallback;
+ exports.getEditorHtml = getEditorHtml;
++exports.getEditorSessionJson = getEditorSessionJson;
+ exports.getConverterHtml = getConverterHtml;
+ exports.putFile = putFile;
+ exports.parsePutFileResponse = parsePutFileResponse;
+diff --git a/DocService/sources/server.js b/DocService/sources/server.js
+index cacfd5c..8fb7259 100644
+--- a/DocService/sources/server.js
++++ b/DocService/sources/server.js
+@@ -343,6 +343,14 @@ docsCoServer.install(server, app, () => {
+     utils.lowercaseQueryString,
+     wopiClient.getEditorHtml
+   );
++  app.post(
++    '/officier/sessions/wopi/:documentType/:mode',
++    checkWopiEnable,
++    urleEcodedParser,
++    forms.none(),
++    utils.lowercaseQueryString,
++    wopiClient.getEditorSessionJson
++  );
+   app.post(
+     '/hosting/wopi/convert-and-edit/:ext/:targetext',
+     checkWopiEnable,

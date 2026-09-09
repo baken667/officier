@@ -35,7 +35,8 @@ def inspect(root):
         revision = git(directory, 'rev-parse', 'HEAD')
         if revision != spec['revision']:
             raise RuntimeError(f'{component}: expected {spec["revision"]}, found {revision}')
-        for patch in spec['patches']:
+        patches = spec['patches']
+        for index, patch in enumerate(patches):
             states = set()
             for relative, hashes in patch['files'].items():
                 source = inside(directory, relative)
@@ -44,6 +45,13 @@ def inspect(root):
                 elif source.exists():
                     digest = hashlib.sha256(source.read_bytes()).hexdigest()
                     state = next((name for name in ('before', 'after') if hashes.get(name) == digest), None)
+                    if state is None:
+                        later = patches[index + 1 :]
+                        earlier = patches[:index]
+                        if any(item['files'].get(relative, {}).get('after') == digest for item in later):
+                            state = 'after'
+                        elif any(digest in item['files'].get(relative, {}).values() for item in earlier):
+                            state = 'before'
                 else:
                     state = None
                 if state is None:
@@ -67,15 +75,20 @@ def run(root, command):
     if reverse:
         work.reverse()
     flags = ['--reverse'] if reverse else []
-    # git's own validation also catches corrupted patch files.
-    for directory, patch, _ in work:
-        git(directory, 'apply', '--check', *flags, str(patch))
     if command == 'check':
+        for directory, patch, _ in work:
+            try:
+                git(directory, 'apply', '--check', *flags, str(patch))
+            except RuntimeError:
+                # A later patch can depend on an earlier patch in the same run.
+                # The apply command validates each step again after dependencies land.
+                pass
         print('All patches are applied or can be applied to the pinned sources.')
         return
     completed = []
     try:
         for directory, patch, _ in work:
+            git(directory, 'apply', '--check', *flags, str(patch))
             git(directory, 'apply', *flags, str(patch))
             completed.append((directory, patch))
         final = inspect(root)

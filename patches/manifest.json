@@ -34,6 +34,19 @@
               "after": "9a32dc27bd8b89da2d31c9ec543b472739e7d00cfd9ed9ee1935abb734d957a8"
             }
           }
+        },
+        {
+          "patch": "patches/server/0004-add-officier-wopi-session-json.patch",
+          "files": {
+            "DocService/sources/wopiClient.js": {
+              "before": "61554de26ba32b25075fc004bfe19e9c7bbc3a367a46b585a43b053cb1668fc4",
+              "after": "ee4feea627e994d4af1399655a75edb8a1060313f2cd404c1a8677df364dc184"
+            },
+            "DocService/sources/server.js": {
+              "before": "9a32dc27bd8b89da2d31c9ec543b472739e7d00cfd9ed9ee1935abb734d957a8",
+              "after": "02dc5797fcc7a455b5463b65c431b768dbf0b5aba7b2b9b7b963a51f87fa730a"
+            }
+          }
         }
       ]
     }
