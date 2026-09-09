@@ -1,0 +1,21 @@
+services:
+  officier:
+    image: ghcr.io/baken667/officier:0.1.0
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "${OFFICIER_BIND:-127.0.0.1}:${OFFICIER_PORT:-8080}:80"
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env before starting}"
+    shm_size: 1gb
+    volumes:
+      - data:/var/www/onlyoffice/Data
+      - cache:/var/lib/onlyoffice
+      - logs:/var/log/onlyoffice
+      - fonts:/usr/share/fonts/truetype/custom
+volumes:
+  data:
+  cache:
+  logs:
+  fonts:

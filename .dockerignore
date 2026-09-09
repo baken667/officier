@@ -1,0 +1,13 @@
+**
+!Dockerfile
+!docker/
+!docker/**
+!server/
+!server/**
+server/.git
+server/**/node_modules
+!patches/
+!patches/**
+!LICENSE
+!tests/
+!tests/capabilities.test.cjs
