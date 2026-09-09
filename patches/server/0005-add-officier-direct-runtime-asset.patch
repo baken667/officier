@@ -2,7 +2,7 @@ diff --git a/DocService/sources/routes/officierRuntime.js b/DocService/sources/r
 index 52c5686..fa14933 100644
 --- a/DocService/sources/routes/officierRuntime.js
 +++ b/DocService/sources/routes/officierRuntime.js
-@@ -16,6 +16,44 @@ const operationContext = require('../../../Common/sources/operationContext');
+@@ -16,6 +16,41 @@ const operationContext = require('../../../Common/sources/operationContext');
  
  const router = express.Router();
  
@@ -44,7 +44,7 @@ index 52c5686..fa14933 100644
  function buildManifest() {
    const buildVersion = commonDefines.buildVersion || 'unknown';
    const buildNumber = commonDefines.buildNumber || 'unknown';
-@@ -25,7 +63,12 @@ function buildManifest() {
+@@ -25,7 +60,12 @@ function buildManifest() {
      protocolVersion: 1,
      buildId: `officier-${buildVersion}-${buildNumber}`,
      sdkVersion: `${buildVersion}.${buildNumber}`,
@@ -58,7 +58,7 @@ index 52c5686..fa14933 100644
      capabilities: {
        word: false,
        wopi: true,
-@@ -39,6 +82,21 @@ function buildManifest() {
+@@ -39,4 +79,19 @@ function buildManifest() {
    };
  }
  

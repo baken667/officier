@@ -84,7 +84,7 @@ def run(root, command):
     if command == 'check':
         for directory, patch, _ in work:
             try:
-                git(directory, 'apply', '--check', *flags, str(patch))
+                git(directory, 'apply', '--check', '--recount', *flags, str(patch))
             except RuntimeError:
                 # A later patch can depend on an earlier patch in the same run.
                 # The apply command validates each step again after dependencies land.
@@ -94,8 +94,8 @@ def run(root, command):
     completed = []
     try:
         for directory, patch, _ in work:
-            git(directory, 'apply', '--check', *flags, str(patch))
-            git(directory, 'apply', *flags, str(patch))
+            git(directory, 'apply', '--check', '--recount', *flags, str(patch))
+            git(directory, 'apply', '--recount', *flags, str(patch))
             completed.append((directory, patch))
         final = inspect(root)
         target = 'before' if reverse else 'after'
@@ -103,7 +103,7 @@ def run(root, command):
             raise RuntimeError('Patch result does not match the manifest')
     except Exception:
         for directory, patch in reversed(completed):
-            git(directory, 'apply', *([] if reverse else ['--reverse']), str(patch))
+            git(directory, 'apply', '--recount', *([] if reverse else ['--reverse']), str(patch))
         raise
     print(f'{command}: {len(work)} patch(es) changed; remaining already in requested state.')
 
