@@ -7,8 +7,9 @@
 Создан отдельный репозиторий [officier-react](https://github.com/baken667/officier-react):
 начальный мост команд к уже работающему `asc_docs_api`, React-панель, типы, unit-тесты
 и ручной workflow GitHub Packages. Загрузчик SDK, canvas и открытие DOCX пока не
-реализованы. Пакет подготовлен к публикации как `0.1.0-alpha.0`, но в реестр ещё не
-опубликован. Локальная копия находится в `clients/officier-react` как независимый
+реализованы. Пакет `@baken667/officier-react@0.1.0-alpha.0` опубликован в GitHub Packages
+([успешный workflow](https://github.com/baken667/officier-react/actions/runs/34324910219)).
+Локальная копия находится в `clients/officier-react` как независимый
 Git-репозиторий и не включается в коммиты сервера.
 
 ## Почему npm-пакет сам по себе не устраняет iframe
