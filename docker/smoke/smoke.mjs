@@ -42,6 +42,8 @@ assert.equal(runtimeManifest.capabilities.word, true);
 assert.equal(runtimeManifest.capabilities.wopi, true);
 assert.equal(runtimeManifest.capabilities.noIframe, true);
 assert.deepEqual(runtimeManifest.assets.map(asset => asset.url), [
+  '/web-apps/vendor/jquery/jquery.min.js',
+  '/web-apps/vendor/xregexp/xregexp-all-min.js',
   '/web-apps/vendor/socketio/socket.io.min.js',
   '/sdkjs/word/sdk-all-min.js',
   'runtime/direct-word-adapter.js'

@@ -7,7 +7,7 @@
 Создан отдельный репозиторий [officier-react](https://github.com/baken667/officier-react):
 начальный мост команд к `asc_docs_api`, React-панель, типы, unit-тесты и ручной
 workflow GitHub Packages. В сервере Officier добавлен thin direct runtime bridge:
-manifest грузит socket.io, `sdkjs/word/sdk-all-min.js` и adapter, adapter создаёт
+manifest грузит jQuery, XRegExp, socket.io, `sdkjs/word/sdk-all-min.js` и adapter, adapter создаёт
 `Asc.asc_docs_api` в DOM-контейнере React-приложения и подаёт WOPI bootstrap.
 Полное browser-подтверждение DOCX open/edit/save без iframe ещё впереди.
 Пакет `@baken667/officier-react@0.1.0-alpha.0` опубликован в GitHub Packages
