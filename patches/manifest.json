@@ -21,6 +21,19 @@
               "after": "ed4aa8b9ce467f31c882db762791e1f9dc70ac61eba352405a80bfe859058dc6"
             }
           }
+        },
+        {
+          "patch": "patches/server/0003-add-officier-runtime-manifest.patch",
+          "files": {
+            "DocService/sources/routes/officierRuntime.js": {
+              "before": null,
+              "after": "225d60319c3b524b4e59f981513cb8b33607de29e622619cc92b7d9f6a0d181a"
+            },
+            "DocService/sources/server.js": {
+              "before": "9e3af7d077f93a666884e302bd5de90fac833e69bac020c9c1c38863e3d1f509",
+              "after": "9a32dc27bd8b89da2d31c9ec543b472739e7d00cfd9ed9ee1935abb734d957a8"
+            }
+          }
         }
       ]
     }

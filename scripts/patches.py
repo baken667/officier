@@ -39,8 +39,13 @@ def inspect(root):
             states = set()
             for relative, hashes in patch['files'].items():
                 source = inside(directory, relative)
-                digest = hashlib.sha256(source.read_bytes()).hexdigest()
-                state = next((name for name in ('before', 'after') if hashes[name] == digest), None)
+                if not source.exists() and hashes.get('before') is None:
+                    state = 'before'
+                elif source.exists():
+                    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+                    state = next((name for name in ('before', 'after') if hashes.get(name) == digest), None)
+                else:
+                    state = None
                 if state is None:
                     raise RuntimeError(f'{component}/{relative}: unexpected contents; preserve/review local edits first')
                 states.add(state)

@@ -1,0 +1,79 @@
+diff --git a/DocService/sources/routes/officierRuntime.js b/DocService/sources/routes/officierRuntime.js
+new file mode 100644
+index 0000000..52c5686
+--- /dev/null
++++ b/DocService/sources/routes/officierRuntime.js
+@@ -0,0 +1,53 @@
++/*
++ * Copyright (C) Ascensio System SIA, 2009-2026
++ *
++ * This program is a free software product. You can redistribute it and/or
++ * modify it under the terms of the GNU Affero General Public License (AGPL)
++ * version 3 as published by the Free Software Foundation, together with the
++ * additional terms provided in the LICENSE file.
++ *
++ * SPDX-License-Identifier: AGPL-3.0-only
++ */
++
++'use strict';
++
++const express = require('express');
++const commonDefines = require('../../../Common/sources/commondefines');
++const operationContext = require('../../../Common/sources/operationContext');
++
++const router = express.Router();
++
++function buildManifest() {
++  const buildVersion = commonDefines.buildVersion || 'unknown';
++  const buildNumber = commonDefines.buildNumber || 'unknown';
++
++  return {
++    protocolVersion: 1,
++    buildId: `officier-${buildVersion}-${buildNumber}`,
++    sdkVersion: `${buildVersion}.${buildNumber}`,
++    assets: [],
++    capabilities: {
++      word: false,
++      wopi: true,
++      noIframe: true
++    },
++    limitations: [
++      'OFFICIER_DIRECT_WORD_ADAPTER_MISSING'
++    ]
++  };
++}
++
++router.get('/runtime/manifest.json', async (req, res) => {
++  const ctx = new operationContext.Context();
++  try {
++    ctx.initFromRequest(req);
++    await ctx.initTenantCache();
++    res.setHeader('Cache-Control', 'no-store');
++    res.json(buildManifest());
++  } catch (err) {
++    ctx.logger.error('officier/runtime/manifest.json error: %s', err.stack);
++    res.sendStatus(500);
++  }
++});
++
++module.exports = router;
+diff --git a/DocService/sources/server.js b/DocService/sources/server.js
+index e1fdb41..cacfd5c 100644
+--- a/DocService/sources/server.js
++++ b/DocService/sources/server.js
+@@ -63,6 +63,7 @@ const tenantManager = require('./../../Common/sources/tenantManager');
+ const staticRouter = require('./routes/static');
+ const infoRouter = require('./routes/info');
+ const metaRouter = require('./routes/meta');
++const officierRuntimeRouter = require('./routes/officierRuntime');
+ const ms = require('ms');
+ const aiProxyHandler = require('./ai/aiProxyHandler');
+ const runtimeConfigManager = require('./../../Common/sources/runtimeConfigManager');
+@@ -219,6 +220,7 @@ docsCoServer.install(server, app, () => {
+     });
+   });
+ 
++  app.use('/officier', officierRuntimeRouter);
+   app.use('/', staticRouter);
+ 
+   const rawFileParser = bodyParser.raw({
