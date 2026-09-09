@@ -1,5 +1,30 @@
 [![License](https://img.shields.io/badge/License-GNU%20AGPL%20V3-green.svg?style=flat)](https://docspace.onlyoffice.com/s/gnC2xcxWjHhHmsM) [![Release](https://img.shields.io/github/v/tag/ONLYOFFICE/DocumentServer?sort=semver&style=flat&label=Release&color=blue)](https://github.com/ONLYOFFICE/DocumentServer/tags)
 
+# Officier
+
+Officier — независимый форк [ONLYOFFICE DocumentServer](https://github.com/ONLYOFFICE/DocumentServer)
+для собственного брендинга и изменения поведения Community Edition.
+Исходный продукт разработан Ascensio System SIA. Этот проект не является официальной редакцией ONLYOFFICE.
+
+**Изменения от 2026-09-09:** подготовлен репозиторий форка, исправлены адреса
+подмодулей для клонирования из другого GitHub-аккаунта, добавлена инструкция разработки.
+Лимиты и интерфейс редакторов пока соответствуют upstream; собственной сборки ещё нет.
+
+- [Репозиторий Officier](https://github.com/baken667/officier)
+- [Подготовка исходников и план кастомизации](docs/officier.md)
+- [Лицензия AGPLv3 и дополнительные условия](LICENSE)
+
+```sh
+# Исходники основных компонентов для разработки
+bash scripts/bootstrap.sh
+
+# Все подмодули, включая движок конвертации, шрифты и словари
+bash scripts/bootstrap.sh --all
+```
+
+Ниже сохранено описание исходного продукта. Таблица редакций и ссылки на релизы
+относятся к ONLYOFFICE, а не к возможностям или сборкам Officier.
+
 ## Welcome to the ONLYOFFICE Docs repo!
 
 [ONLYOFFICE Docs](https://www.onlyoffice.com/docs?utm_source=github&utm_medium=cpc&utm_campaign=GitHubDS)* is a free collaborative online office suite comprising viewers and editors for texts, spreadsheets, presentations, forms, PDFs, and diagrams. It is fully compatible with Office Open XML formats (.docx, .xlsx, .pptx) and enables collaborative editing in real time.
